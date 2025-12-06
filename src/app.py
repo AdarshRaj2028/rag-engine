@@ -24,8 +24,12 @@ def load_documents() -> List[str]:
     # HINT: Read the documents from the data directory
     # HINT: Return a list of documents
     # HINT: Your implementation depends on the type of documents you are using (.txt, .pdf, etc.)
+    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    file_paths = [os.path.join(DATA_DIR, filename)for filename in os.listdir(DATA_DIR)]   
+    for path in file_paths:
+        with open(path, "r", encoding="utf-8") as f:
+            results.append(f.read())
 
-    # Your implementation here
     return results
 
 
@@ -49,11 +53,9 @@ class RAGAssistant:
         self.vector_db = VectorDB()
 
         # Create RAG prompt template
-        # TODO: Implement your RAG prompt template
-        # HINT: Use ChatPromptTemplate.from_template() with a template string
-        # HINT: Your template should include placeholders for {context} and {question}
-        # HINT: Design your prompt to effectively use retrieved context to answer questions
-        self.prompt_template = None  # Your implementation here
+        self.prompt_template = ChatPromptTemplate.from_template(
+            "You are a helpful assistant. Use the following context to answer the question.\n\nContext: {context}\n\nQuestion: {question}"
+        )
 
         # Create the chain
         self.chain = self.prompt_template | self.llm | StrOutputParser()

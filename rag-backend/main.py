@@ -1,7 +1,18 @@
-from fastapi import FastAPI
+
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+
+
+
+# Import the actual RAG assistant
+from src.app import RAGAssistant, load_documents
 
 # ---------------- FastAPI app ----------------
 
@@ -10,6 +21,34 @@ app = FastAPI(
     description="FastAPI layer for the RAG UI (chat + docs).",
     version="0.1.0",
 )
+
+# ---------------- Global RAG Assistant ----------------
+
+assistant = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global assistant
+    try:
+        # Initialize the RAG assistant
+        assistant = RAGAssistant()
+        # Load and add documents to the knowledge base
+        sample_docs = load_documents()
+        assistant.add_documents(sample_docs)
+        print("✅ RAG Assistant initialized successfully with documents")
+    except Exception as e:
+        print(f"❌ Failed to initialize RAG Assistant: {e}")
+        assistant = None
+
+    # Yield control to the app (app is running)
+    yield
+
+    # Optional: shutdown code can go here
+    # e.g., closing database connections, cleaning resources
+    print("App is shutting down...")
+
+# Create FastAPI app with lifespan
+app = FastAPI(lifespan=lifespan)
 
 # ---------------- CORS (for React) ----------------
 
@@ -53,34 +92,33 @@ def health():
     return {"status": "ok"}
 
 
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(body: ChatRequest):
     """
     Main chat endpoint used by the React UI.
-
-    For now this is a demo implementation.
-    Adarsh can replace the 'reply' construction with a call into the actual
-    RAG pipeline and SQLite conversation memory.
+    
+    Uses the actual RAG assistant to process queries.
     """
-
-    # ---- demo reply (works now, before RAG is wired) ----
-    mode = "doc-aware" if body.active_doc_id else "global"
-    reply = (
-        f"[demo] Model = {body.model} | Mode = {mode}\n\n"
-        f"You asked:\n{body.query}\n\n"
-        "This is a placeholder FastAPI response. "
-        "The final version will call the RAG engine and return a grounded answer."
-    )
-
-    # ---- when RAGAssistant is ready, change to something like: ----
-    # answer = assistant.invoke(
-    #     input=body.query,
-    #     n_results=3,
-    #     # and optionally pass body.active_doc_id or body.model into your RAG logic
-    # )
-    # return ChatResponse(reply=answer)
-
-    return ChatResponse(reply=reply)
+    if assistant is None:
+        raise HTTPException(
+            status_code=503, 
+            detail="RAG Assistant not initialized. Check server logs for errors."
+        )
+    
+    try:
+        # Use the RAG assistant to process the query
+        answer = assistant.query(body.query, n_results=3)
+        
+        # Return the RAG response
+        return ChatResponse(reply=answer)
+        
+    except Exception as e:
+        # Handle any errors from the RAG pipeline
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing query: {str(e)}"
+        )
 
 
 #---------------------------------------------------------------------------------------------------------------------------------------------

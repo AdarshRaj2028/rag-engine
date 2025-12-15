@@ -3,7 +3,10 @@ from typing import List
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from vectordb import VectorDB
+
+
+
+from src.vectordb import VectorDB
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -62,11 +65,18 @@ class RAGAssistant:
 
         print("RAG Assistant initialized successfully")
 
+
     def _initialize_llm(self):
         """
         Initialize the LLM by checking for available API keys.
         Tries OpenAI, Groq, and Google Gemini in that order.
         """
+        # Debug: Print available environment variables
+        print("Debug: Checking environment variables...")
+        print(f"OPENAI_API_KEY exists: {'OPENAI_API_KEY' in os.environ}")
+        print(f"GROQ_API_KEY exists: {'GROQ_API_KEY' in os.environ}")
+        print(f"GOOGLE_API_KEY exists: {'GOOGLE_API_KEY' in os.environ}")
+        
         # Check for OpenAI API key
         if os.getenv("OPENAI_API_KEY"):
             model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -92,6 +102,13 @@ class RAGAssistant:
             )
 
         else:
+            print("❌ No API keys found in environment variables")
+            print("Current .env file contents:")
+            try:
+                with open('.env', 'r') as f:
+                    print(f.read())
+            except:
+                print("Could not read .env file")
             raise ValueError(
                 "No valid API key found. Please set one of: OPENAI_API_KEY, GROQ_API_KEY, or GOOGLE_API_KEY in your .env file"
             )
@@ -105,27 +122,56 @@ class RAGAssistant:
         """
         self.vector_db.add_documents(documents)
 
-    def invoke(self, input: str, n_results: int = 3) -> str:
+
+
+    def query(self, question: str, n_results: int = 3) -> str:
         """
         Query the RAG assistant.
 
         Args:
-            input: User's input
+            question: User's question
             n_results: Number of relevant chunks to retrieve
 
         Returns:
-            Dictionary containing the answer and retrieved context
+            String containing the answer from the LLM
         """
-        llm_answer = ""
-        # TODO: Implement the RAG query pipeline
-        # HINT: Use self.vector_db.search() to retrieve relevant context chunks
-        # HINT: Combine the retrieved document chunks into a single context string
-        # HINT: Use self.chain.invoke() with context and question to generate the response
-        # HINT: Return a string answer from the LLM
+        try:
+            print(f"Debug: Processing query: {question}")
+            print(f"Debug: Using {n_results} results")
+            
 
-        # Your implementation here
-        return llm_answer
-
+            # Retrieve relevant context chunks from vector database
+            print("Debug: Searching vector database...")
+            search_results = self.vector_db.search(question, n_results=n_results)
+            print(f"Debug: Search results type: {type(search_results)}")
+            
+            # Extract the documents from search results
+            # search_results is a dict when using single query (our case)
+            if search_results:
+                documents = search_results['documents']
+                print(f"Debug: Retrieved {len(documents)} documents")
+                # Combine retrieved document chunks into a single context string
+                context = "\n\n".join(documents)
+            else:
+                print("Debug: No documents found")
+                context = "No relevant documents found."
+            
+            print("Debug: Generating response with LLM...")
+            # Use the chain to generate response with context and question
+            response = self.chain.invoke({
+                "context": context,
+                "question": question
+            })
+            
+            print(f"Debug: Response generated successfully: {len(response)} characters")
+            return response
+            
+        except Exception as e:
+            print(f"Debug: Exception in query method: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return f"Error processing query: {str(e)}"
+    
 
 def main():
     """Main function to demonstrate the RAG assistant."""

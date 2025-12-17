@@ -1,6 +1,8 @@
 
 import sys
 import os
+
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from contextlib import asynccontextmanager
 
@@ -10,7 +12,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 
-
+from src.database import RAGDatabase
 # Import the actual RAG assistant
 from src.app import RAGAssistant, load_documents
 
@@ -21,6 +23,10 @@ app = FastAPI(
     description="FastAPI layer for the RAG UI (chat + docs).",
     version="0.1.0",
 )
+# Initialize database
+db = RAGDatabase(db_path="rag_engine.db")  
+db.connect()
+db.create_tables()
 
 # ---------------- Global RAG Assistant ----------------
 
@@ -92,33 +98,53 @@ def health():
     return {"status": "ok"}
 
 
-
 @app.post("/chat", response_model=ChatResponse)
 async def chat(body: ChatRequest):
-    """
-    Main chat endpoint used by the React UI.
-    
-    Uses the actual RAG assistant to process queries.
-    """
-    if assistant is None:
-        raise HTTPException(
-            status_code=503, 
-            detail="RAG Assistant not initialized. Check server logs for errors."
-        )
-    
-    try:
-        # Use the RAG assistant to process the query
-        answer = assistant.query(body.query, n_results=3)
-        
-        # Return the RAG response
-        return ChatResponse(reply=answer)
-        
-    except Exception as e:
-        # Handle any errors from the RAG pipeline
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing query: {str(e)}"
-        )
+    query_text = body.query.strip()
+    if not query_text:
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    # If client didn't provide a session_id, generate a new one
+    session_id = getattr(body, "session_id", None)
+    if session_id is None:
+        session_id = db.generate_session_id()
+        db.create_session(session_id)
+
+    # Add user message
+    db.add_message(session_id=session_id, role="user", content=query_text)
+
+    # Get answer from RAG
+    answer = assistant.query(query_text, n_results=3)
+
+    # Add assistant message
+    db.add_message(session_id=session_id, role="assistant", content=answer)
+
+    return ChatResponse(reply=answer)
+
+    #"""
+    #Main chat endpoint used by the React UI.
+    #
+    #Uses the actual RAG assistant to process queries.
+    #"""
+    #if assistant is None:
+    #    raise HTTPException(
+    #        status_code=503, 
+    #        detail="RAG Assistant not initialized. Check server logs for errors."
+    #    )
+    #
+    #try:
+    #    # Use the RAG assistant to process the query
+    #    answer = assistant.query(body.query, n_results=3)
+    #    
+    #    # Return the RAG response
+    #    return ChatResponse(reply=answer)
+    #    
+    #except Exception as e:
+    #    # Handle any errors from the RAG pipeline
+    #    raise HTTPException(
+    #        status_code=500,
+    #        detail=f"Error processing query: {str(e)}"
+    #    )
 
 
 #---------------------------------------------------------------------------------------------------------------------------------------------

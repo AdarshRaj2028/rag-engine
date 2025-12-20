@@ -68,3 +68,52 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+
+
+# Project structure
+
+rag-ui/
+├── node_modules/
+├── public/
+│   ├── index.html
+│   ├── favicon.ico
+│   ├── manifest.json
+│   └── logo192.png
+│
+├── src/
+│   ├── assets/
+│   │   ├── images/
+│   │   │   └── hero-illustration.png
+│   │   └── icons/
+│   │       └── chat-icon.svg
+│   │
+│   ├── components/
+│   │   ├── Navbar.jsx
+│   │   ├── HeroSection.jsx
+│   │   ├── ChatPreview.jsx
+│   │   ├── FeatureCard.jsx
+│   │   ├── FeaturesSection.jsx
+│   │   ├── Footer.jsx
+│   │   └── AboutSection.jsx
+│   │
+│   ├── pages/
+│   │   ├── Home.jsx
+│   │   ├── ChatPage.jsx
+│   │   └── AboutPage.jsx
+│   │
+│   ├── styles/
+│   │   ├── global.css
+│   │   ├── navbar.css
+│   │   ├── hero.css
+│   │   ├── chat.css
+│   │   └── features.css
+│   │
+│   ├── App.jsx
+│   ├── index.js
+│   └── constants.js
+│
+├── .gitignore
+├── package.json
+├── README.md
+└── yarn.lock / package-lock.json

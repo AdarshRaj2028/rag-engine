@@ -245,7 +245,8 @@ with st.sidebar:
                 st.session_state.file_processed = False
                 st.session_state.error_message = None
                 
-                assistant = st.session_state.assistant
+                # FIX: Get assistant from cached resource function
+                assistant = get_rag_assistant()
                 
                 if assistant:
                     with st.status("📄 Processing Document...", expanded=True) as status:
@@ -272,7 +273,7 @@ with st.sidebar:
                                 st.session_state.upload_result = result
                                 st.session_state.session_id = result.get("session_id")
                                 st.session_state.file_processed = True
-                                st.session_state.assistant = assistant
+                                st.session_state.assistant = assistant  # Store for later use
                                 
                                 status.update(label="✅ Ready to Chat!", state="complete", expanded=False)
                                 time.sleep(1)
@@ -359,13 +360,13 @@ if st.session_state.page == 'Home':
 elif st.session_state.page == 'Chat':
     st.title("💬 Chat with Your Documents")
     
-    # ✅ LOGIC RESTORED: Block interaction if no file uploaded
+    # Block interaction if no file uploaded
     if not st.session_state.file_processed:
         st.warning("⚠️ Please upload a PDF or TXT file in the sidebar to initialize the RAG engine.")
         st.info("💡 Once uploaded, you can ask questions about your document!")
-        st.stop()  # 🛑 Halts execution here, preventing chat input from showing
+        st.stop()
     
-    # === FINAL CHAT LOGIC (NO MORE GHOSTS!) ===
+    # CHAT LOGIC
     
     # 1. Display all historical messages
     for message in st.session_state.messages:
@@ -389,7 +390,9 @@ elif st.session_state.page == 'Chat':
         
         with st.chat_message("assistant"):
             with st.spinner("🤔 Thinking..."):
-                assistant = st.session_state.assistant
+                # FIX: Get assistant from session_state (now properly initialized) or cache
+                assistant = st.session_state.assistant or get_rag_assistant()
+                
                 if assistant:
                     try:
                         if not st.session_state.session_id:

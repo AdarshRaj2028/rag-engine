@@ -11,8 +11,6 @@ from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Load environment variables
-load_dotenv()
 
 # FIX: Create data directory at project root (one level up from src/)
 # If app.py is in src/, this goes to project root
@@ -20,6 +18,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
+# Load environment variables
+load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, ".env"))
 
 def get_data_filepath():
     """

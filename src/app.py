@@ -1,12 +1,12 @@
 import os
-from typing import List
+import traceback
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-
-
-from src.vectordb import VectorDB
+from vectordb import VectorDB
+from utils import validate_txt_or_pdf
+from database import RAGDatabase
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -14,26 +14,44 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Load environment variables
 load_dotenv()
 
+# FIX: Create data directory at project root (one level up from src/)
+# If app.py is in src/, this goes to project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
-def load_documents() -> List[str]:
+
+def get_data_filepath():
+    """
+    FIX: Safely get the first file from data directory.
+    Returns (filename, filepath) tuple or (None, None) if no files.
+    """
+    if not os.path.exists(DATA_DIR):
+        return None, None
+    
+    entries = os.listdir(DATA_DIR)
+    if not entries:
+        return None, None
+    
+    # Get first valid file (pdf or txt)
+    for entry in entries:
+        if entry.lower().endswith(('.pdf', '.txt')):
+            filename = entry
+            filepath = os.path.join(DATA_DIR, filename)
+            return filename, filepath
+    
+    return None, None
+
+
+def load_document(filename: str, filepath: str) -> str:
     """
     Load documents for demonstration.
 
     Returns:
-        List of sample documents
+        Content of pdf or txt file in str format
     """
-    results = []
-    # TODO: Implement document loading
-    # HINT: Read the documents from the data directory
-    # HINT: Return a list of documents
-    # HINT: Your implementation depends on the type of documents you are using (.txt, .pdf, etc.)
-    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-    file_paths = [os.path.join(DATA_DIR, filename)for filename in os.listdir(DATA_DIR)]   
-    for path in file_paths:
-        with open(path, "r", encoding="utf-8") as f:
-            results.append(f.read())
-
-    return results
+    raw_text = validate_txt_or_pdf(filename, filepath)
+    return raw_text
 
 
 class RAGAssistant:
@@ -48,19 +66,30 @@ class RAGAssistant:
         self.llm = self._initialize_llm()
         if not self.llm:
             raise ValueError(
-                "No valid API key found. Please set one of: "
+                "No valid API key found. "
+                "Please set one of: "
                 "OPENAI_API_KEY, GROQ_API_KEY, or GOOGLE_API_KEY in your .env file"
             )
 
-        # Initialize vector database
-        self.vector_db = VectorDB()
+        self.db_path = "rag_engine.db"
 
+        # Initialize SQLite database
+        temp_db = RAGDatabase(self.db_path)
+        temp_db.connect()
+        temp_db.create_tables()
+        temp_db.close()
+
+        # For backwards compatibility with Streamlit       
+        self.current_session_id = None
+        self.current_collection_name = None
+    
         # Create RAG prompt template
         self.prompt_template = ChatPromptTemplate.from_template(
-            "You are a helpful assistant. Use the following context to answer the question.\n\nContext: {context}\n\nQuestion: {question}"
+            "Act as a helpful assistant. "
+            "Use the following context STRICTLY to answer the question"
+            "\nBe inside the scope of the provided context."
+            "\n\nContext: {context}\n\nQuestion: {question}"
         )
-
-        # Create the chain
         self.chain = self.prompt_template | self.llm | StrOutputParser()
 
         print("RAG Assistant initialized successfully")
@@ -69,7 +98,7 @@ class RAGAssistant:
     def _initialize_llm(self):
         """
         Initialize the LLM by checking for available API keys.
-        Tries OpenAI, Groq, and Google Gemini in that order.
+        Tries Google Gemini, Groq, and OpenAI in that order.
         """
         # Debug: Print available environment variables
         print("Debug: Checking environment variables...")
@@ -78,31 +107,31 @@ class RAGAssistant:
         print(f"GOOGLE_API_KEY exists: {'GOOGLE_API_KEY' in os.environ}")
         
         # Check for OpenAI API key
-        if os.getenv("OPENAI_API_KEY"):
-            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-            print(f"Using OpenAI model: {model_name}")
-            return ChatOpenAI(
-                api_key=os.getenv("OPENAI_API_KEY"), model=model_name, temperature=0.0
+        if os.getenv("GOOGLE_API_KEY"):
+            model_name = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash-exp")
+            print(f"Using Google Gemini model: {model_name}")
+            return ChatGoogleGenerativeAI(
+                google_api_key=os.getenv("GOOGLE_API_KEY"),
+                model=model_name,
+                temperature=0.1,
             )
 
         elif os.getenv("GROQ_API_KEY"):
             model_name = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
             print(f"Using Groq model: {model_name}")
             return ChatGroq(
-                api_key=os.getenv("GROQ_API_KEY"), model=model_name, temperature=0.0
+                api_key=os.getenv("GROQ_API_KEY"), model=model_name, temperature=0.1
             )
 
-        elif os.getenv("GOOGLE_API_KEY"):
-            model_name = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash")
-            print(f"Using Google Gemini model: {model_name}")
-            return ChatGoogleGenerativeAI(
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                model=model_name,
-                temperature=0.0,
+        elif os.getenv("OPENAI_API_KEY"):
+            model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+            print(f"Using OpenAI model: {model_name}")
+            return ChatOpenAI(
+                api_key=os.getenv("OPENAI_API_KEY"), model=model_name, temperature=0.1
             )
-
+        
         else:
-            print("❌ No API keys found in environment variables")
+            print("No API keys found in environment variables")
             print("Current .env file contents:")
             try:
                 with open('.env', 'r') as f:
@@ -113,65 +142,191 @@ class RAGAssistant:
                 "No valid API key found. Please set one of: OPENAI_API_KEY, GROQ_API_KEY, or GOOGLE_API_KEY in your .env file"
             )
 
-    def add_documents(self, documents: List) -> None:
+    def upload_document(self, filepath: str) -> dict:
         """
-        Add documents to the knowledge base.
+        Add documents to the knowledge base. Works for both Streamlit and FastAPI.
 
         Args:
-            documents: List of documents
+            filepath: path of the uploaded documents
+        
+        Returns:
+            dict: Always returns a dictionary with success/error info
         """
-        self.vector_db.add_documents(documents)
+        db = RAGDatabase(self.db_path)
+        db.connect()
 
+        try:
+            if not os.path.exists(filepath):
+                return {"error": f"File not found: {filepath}"}
+            
+            filename = os.path.basename(filepath)
+            
+            # FIX: Validate file type before processing
+            if not filename.lower().endswith(('.pdf', '.txt')):
+                return {"error": "Invalid file type. Only PDF and TXT files are supported."}
+            
+            doc_text = load_document(filename, filepath)
+            doc_in_bytes = doc_text.encode("utf-8")
+            
+            result = db.process_file_upload(doc_in_bytes, filename)
+            
+            document_id = result["document_id"]
+            session_id = result["session_id"]
+            was_processed = result["was_processed"]
+            
+            if was_processed:
+                vector_db = VectorDB(collection_name=result["collection_name"])
+                chunk_count = vector_db.add_document(doc_text, document_id)
+                db.update_chunk_count(document_id, chunk_count)
 
+                self.current_session_id = session_id
+                self.current_collection_name = result["collection_name"]
+                
+                return {
+                    "session_id": self.current_session_id,
+                    "collection_name": self.current_collection_name,
+                    "document_id": document_id,
+                    "was_processed": was_processed,
+                    "chunk_count": chunk_count,
+                    "status": "success"
+                }
+            else:
+                doc_info = db.get_document_by_session(session_id)
+                chunk_count = doc_info["chunk_count"] if doc_info else 0
 
-    def query(self, question: str, n_results: int = 3) -> str:
+                self.current_session_id = session_id
+                self.current_collection_name = result["collection_name"]
+
+                return {
+                    "session_id": self.current_session_id,
+                    "collection_name": self.current_collection_name,
+                    "document_id": document_id,
+                    "was_processed": was_processed,
+                    "chunk_count": chunk_count,
+                    "filename": filename,
+                    "message": "File already initialized. Fetching existing chunks",
+                    "status": "success"
+                }
+
+        except FileNotFoundError as e:
+            return {"error": f"File not found: {e}", "status": "error"}
+        except FileExistsError as e:
+            return {"error": f"File doesn't exist: {e}", "status": "error"}
+        except Exception as e:
+            traceback.print_exc()
+            return {"error": f"Error processing file: {str(e)}", "status": "error"}
+        finally:
+            db.close()
+
+    def query(self, question: str, session_id: str = None, n_results: int = 3) -> dict:
         """
-        Query the RAG assistant.
+        Query the document (Works with both Streamlit and FastAPI).
 
         Args:
             question: User's question
+            session_id: Optional session ID (for FastAPI stateless calls)
+                        If None, uses self.current_session_id (for Streamlit)
             n_results: Number of relevant chunks to retrieve
 
         Returns:
-            String containing the answer from the LLM
+            Dict containing the answer from the LLM or error message
         """
+        db = RAGDatabase(self.db_path)
+        db.connect()
+
         try:
-            print(f"Debug: Processing query: {question}")
-            print(f"Debug: Using {n_results} results")
+            active_session_id = session_id or self.current_session_id
+
+            if not active_session_id:
+                return {"error": "No active session. Need to upload a document first.", "status": "error"}
             
+            # Save user message
+            try:
+                db.add_message(active_session_id, "user", question)
+                print(f"User message saved")
+            except Exception as e:
+                print(f"Warning: Could not save user message: {e}")
+            
+            doc_info = db.get_document_by_session(active_session_id)
+        
+            if not doc_info:
+                return {"error": "Session not found in database.", "status": "error"}
+            
+            collection_name = doc_info["collection_name"]
+
+            print(f"STEP: Processing query: {question}")
+            print(f"STEP: Using {n_results} results")
+            
+            # Initialize vector database
+            vector_db = VectorDB(collection_name=collection_name)
 
             # Retrieve relevant context chunks from vector database
-            print("Debug: Searching vector database...")
-            search_results = self.vector_db.search(question, n_results=n_results)
-            print(f"Debug: Search results type: {type(search_results)}")
+            print("STEP: Searching vector database...")
+            search_results = vector_db.search(question, n_results=n_results)
             
-            # Extract the documents from search results
-            # search_results is a dict when using single query (our case)
-            if search_results:
-                documents = search_results['documents']
-                print(f"Debug: Retrieved {len(documents)} documents")
-                # Combine retrieved document chunks into a single context string
-                context = "\n\n".join(documents)
-            else:
-                print("Debug: No documents found")
-                context = "No relevant documents found."
+            print(f"STEP: Search results type: {type(search_results)}")
             
-            print("Debug: Generating response with LLM...")
+            # FIX: Better error handling for search results
+            if not search_results:
+                return {"error": "No search results returned", "status": "error"}
+            
+            if not isinstance(search_results, dict):
+                return {"error": "Invalid search results format", "status": "error"}
+            
+            documents = search_results.get('documents', [])
+            
+            if not documents:
+                return {
+                    "answer": "I couldn't find any relevant information in the document to answer your question.",
+                    "sources": [],
+                    "status": "no_results",
+                    "session_id": active_session_id
+                }
+            
+            # Combine retrieved document chunks into a single context string
+            context = "\n\n".join(documents)
+            
+            if not context.strip():
+                return {
+                    "answer": "The retrieved context was empty. Please try rephrasing your question.",
+                    "sources": documents,
+                    "status": "empty_context",
+                    "session_id": active_session_id
+                }
+            
+            print(f"STEP: Context length: {len(context)} characters")
+            print(f"STEP: Retrieved {len(documents)} documents")
+            
+            print("STEP: Generating response with LLM...")
             # Use the chain to generate response with context and question
             response = self.chain.invoke({
                 "context": context,
                 "question": question
             })
+
+            # Save assistant message
+            try:
+                db.add_message(active_session_id, "assistant", response)
+            except Exception as e:
+                print(f"Warning: Could not save assistant message: {e}")
             
-            print(f"Debug: Response generated successfully: {len(response)} characters")
-            return response
+            print(f"STEP: Response generated successfully: {len(response)} characters")
             
+            return {
+                "answer": response,
+                "sources": documents,
+                "status": "success",
+                "session_id": active_session_id
+            }
+            
+        except KeyError as e:
+            return {"error": f"Key error: {e}. Check your vector database.", "status": "error"}
         except Exception as e:
-            print(f"Debug: Exception in query method: {type(e).__name__}: {e}")
-            import traceback
             traceback.print_exc()
-            return f"Error processing query: {str(e)}"
-    
+            return {"error": f"Exception: {type(e).__name__}: {str(e)}", "status": "error"}
+        finally:
+            db.close()
+
 
 def main():
     """Main function to demonstrate the RAG assistant."""
@@ -180,29 +335,63 @@ def main():
         print("Initializing RAG Assistant...")
         assistant = RAGAssistant()
 
-        # Load sample documents
-        print("\nLoading documents...")
-        sample_docs = load_documents()
-        print(f"Loaded {len(sample_docs)} sample documents")
+        # FIX: Safely get file path
+        filename, filepath = get_data_filepath()
+        
+        if not filename or not filepath:
+            print("ERROR: No valid files found in data/ directory")
+            print("Please add a PDF or TXT file to the data/ folder")
+            return
 
-        assistant.add_documents(sample_docs)
-
+        # Load and upload document
+        print(f"\nLoading document: {filename}")
+        upload_result = assistant.upload_document(filepath)
+        
+        # FIX: Check for errors in upload
+        if upload_result.get("status") == "error":
+            print(f"ERROR uploading document: {upload_result.get('error')}")
+            return
+        
+        print(f"Document uploaded successfully!")
+        print(f"Chunks: {upload_result.get('chunk_count', 'unknown')}")
+        
         done = False
+        print("\n" + "="*50)
+        print("RAG Assistant Ready! Type 'quit' to exit.")
+        print("="*50 + "\n")
 
         while not done:
-            question = input("Enter a question or 'quit' to exit: ")
-            if question.lower() == "quit":
+            question = input("You: ").strip()
+            
+            if not question:
+                continue
+                
+            if question.lower() in ['quit', 'exit', 'q']:
                 done = True
+                print("Goodbye!")
             else:
                 result = assistant.query(question)
-                print(result)
+                
+                if result.get("status") == "success":
+                    print(f"\nAI: {result['answer']}\n")
+                    
+                    # Optionally show sources
+                    if result.get("sources"):
+                        show_sources = input("Show sources? (y/n): ").lower()
+                        if show_sources == 'y':
+                            print("\nSources:")
+                            for i, source in enumerate(result["sources"], 1):
+                                print(f"\n[{i}] {source[:200]}...")
+                    print()
+                else:
+                    print(f"\nERROR: {result.get('error', 'Unknown error')}\n")
 
     except Exception as e:
         print(f"Error running RAG assistant: {e}")
-        print("Make sure you have set up your .env file with at least one API key:")
-        print("- OPENAI_API_KEY (OpenAI GPT models)")
-        print("- GROQ_API_KEY (Groq Llama models)")
-        print("- GOOGLE_API_KEY (Google Gemini models)")
+        traceback.print_exc()
+        print("\nMake sure you have:")
+        print("1. Set up your .env file with at least one API key")
+        print("2. Added a PDF or TXT file to the data/ folder")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,155 @@
+from pypdf import PdfReader
+from fastapi import HTTPException, UploadFile
+from langchain_community.document_loaders import PyMuPDFLoader
+import os
+
+MAX_PAGES = 100
+
+
+def validate_txt_or_pdf(filename: str, filepath: str) -> str:
+    """
+    Validate and load content from PDF or TXT files.
+    
+    Args:
+        filename: Name of the file with extension
+        filepath: Full path to the file
+    
+    Returns:
+        str: Raw text content from the file
+    
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        TypeError: If file is not PDF or TXT
+        Exception: If PDF is too large
+    """
+    # Check if file exists
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    # Case-insensitive extension check
+    file_lower = filename.lower()
+    
+    if file_lower.endswith(".pdf"):
+        try:
+            loader = PyMuPDFLoader(filepath, mode="single")
+            docs = loader.load()
+            
+            if not docs:
+                raise Exception("PDF file is empty or couldn't be loaded")
+            
+            page_count = docs[0].metadata.get("total_pages", 0)
+            
+            if page_count > MAX_PAGES:
+                raise Exception(
+                    f"Document too large: {page_count} pages. "
+                    f"Maximum allowed limit is {MAX_PAGES} pages."
+                )
+            
+            raw_text = docs[0].page_content
+            
+            if not raw_text or not raw_text.strip():
+                raise Exception("PDF contains no extractable text")
+            
+            return raw_text
+            
+        except Exception as e:
+            # Re-raise with more context if it's our custom exception
+            if "Document too large" in str(e) or "no extractable text" in str(e):
+                raise
+            # Otherwise, wrap in a more descriptive error
+            raise Exception(f"Error processing PDF: {str(e)}")
+    
+    elif file_lower.endswith(".txt"):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as txt_file:
+                raw_text = txt_file.read()
+            
+            if not raw_text or not raw_text.strip():
+                raise Exception("TXT file is empty")
+            
+            return raw_text
+            
+        except UnicodeDecodeError:
+            # Try with different encoding if UTF-8 fails
+            try:
+                with open(filepath, 'r', encoding='latin-1') as txt_file:
+                    raw_text = txt_file.read()
+                return raw_text
+            except Exception as e:
+                raise Exception(f"Error reading TXT file: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Error processing TXT file: {str(e)}")
+    
+    else:
+        raise TypeError(
+            f"Unsupported file type: {filename}. "
+            "Only .pdf and .txt files are supported."
+        )
+
+
+def validate_pdf_upload(file: UploadFile) -> int:
+    """
+    Validate an uploaded PDF file (for FastAPI).
+    
+    Args:
+        file: UploadFile object from FastAPI
+    
+    Returns:
+        int: Number of pages in the PDF
+    
+    Raises:
+        HTTPException: If PDF is invalid or too large
+    """
+    try:
+        # Read the file content
+        reader = PdfReader(file.file)
+        num_pages = len(reader.pages)
+        
+        if num_pages > MAX_PAGES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"PDF too large: {num_pages} pages (limit is {MAX_PAGES})."
+            )
+        
+        # Rewind the file pointer for later processing
+        file.file.seek(0)
+        return num_pages
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error validating PDF: {str(e)}"
+        )
+
+
+def get_file_size_mb(filepath: str) -> float:
+    """
+    Get file size in megabytes.
+    
+    Args:
+        filepath: Path to the file
+    
+    Returns:
+        float: File size in MB
+    """
+    if not os.path.exists(filepath):
+        return 0.0
+    
+    size_bytes = os.path.getsize(filepath)
+    size_mb = size_bytes / (1024 * 1024)
+    return round(size_mb, 2)
+
+
+def is_valid_file_type(filename: str) -> bool:
+    """
+    Check if filename has a valid extension.
+    
+    Args:
+        filename: Name of the file
+    
+    Returns:
+        bool: True if file type is supported
+    """
+    return filename.lower().endswith(('.pdf', '.txt'))

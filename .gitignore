@@ -43,6 +43,9 @@ chroma_db/
 Thumbs.db
 
 lesson.md
+.gitignore
+test_rag_sys.py
+data-demo
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

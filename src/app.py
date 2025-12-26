@@ -60,37 +60,31 @@ class RAGAssistant:
     Supports OpenAI, Groq, and Google Gemini APIs.
     """
 
-    def __init__(self,require_api_key=True,model=None):
+    def __init__(self, require_api_key=False, model=None):
         """Initialize the RAG assistant.
         Args:
             require_api_key: If True, will raise an error if no API key is found.
-                            If False, will allow initialization without an API key.
+            model: The model to use
         """
-
         # Store the model
-        self.current_model = model or os.getenv("CURRENT_MODEL")
-
-        # Initialize LLM - check for available API keys in order of preference
-        self.llm = self._initialize_llm(require_api_key, self.current_model)
-        # if not self.llm:
-        #     raise ValueError(
-        #         "No valid API key found. "
-        #         "Please set one of: "
-        #         "OPENAI_API_KEY, GROQ_API_KEY, or GOOGLE_API_KEY in your .env file"
-        #     )
-
+        self.current_model = model
+        
+        # DON'T initialize LLM here anymore - it will be done via set_api_key()
+        self.llm = None
+        self.chain = None
+        
         self.db_path = "rag_engine.db"
-
+        
         # Initialize SQLite database
         temp_db = RAGDatabase(self.db_path)
         temp_db.connect()
         temp_db.create_tables()
         temp_db.close()
-
-        # For backwards compatibility with Streamlit       
+        
+        # For backwards compatibility with Streamlit
         self.current_session_id = None
         self.current_collection_name = None
-    
+        
         # Create RAG prompt template
         self.prompt_template = ChatPromptTemplate.from_template(
             "Act as a helpful assistant. "
@@ -98,16 +92,12 @@ class RAGAssistant:
             "\nBe inside the scope of the provided context."
             "\n\nContext: {context}\n\nQuestion: {question}"
         )
-        if self.llm:
-            self.chain = self.prompt_template | self.llm | StrOutputParser()
-        else:
-            self.chain = None
-
-        print("RAG Assistant initialized successfully")
-
+        
+        print("RAG Assistant initialized successfully (no LLM yet)")
 
     def _initialize_llm(self, require_api_key=True, model=None):
         """
+        Can be used as a Fallback
         Initialize the LLM by checking for available API keys.
         Tries Google Gemini, Groq, and OpenAI in that order.
         Args:
@@ -123,6 +113,9 @@ class RAGAssistant:
         print(f"API_KEY exists: {'API_KEY' in os.environ}")
         print(f"Requested model: {model}")
         
+        groq_key = os.getenv("GROQ_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
         # Check for Google API key
         if os.getenv("GOOGLE_API_KEY"):
             model_name = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash-exp")
@@ -239,33 +232,6 @@ class RAGAssistant:
         self.chain = self.prompt_template | self.llm | StrOutputParser()
         print("LLM initialized successfully")
     
-    # def set_api_key(self, api_key: str, model: str=None):
-    #     """
-    #     Set an API key and initialize the LLM.
-        
-    #     Args:
-    #         api_key: The API key to use
-    #         model: The model to use
-    #     """
-    #     # Update the current model
-    #     if model:
-    #         self.current_model = model
-        
-    #     # Determine the provider based on key format
-    #     if api_key.startswith("gsk_"):
-    #         print(f"Setting Groq API key")
-    #         self.llm = ChatGroq(api_key=api_key, model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"), temperature=0.1)
-    #     elif api_key.startswith("sk-"):
-    #         print(f"Setting OpenAI API key")
-    #         self.llm = ChatOpenAI(api_key=api_key, model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), temperature=0.1)
-    #     else:
-    #         # Default to OpenAI for unknown formats
-    #         print(f"Setting generic API key with OpenAI")
-    #         self.llm = ChatOpenAI(api_key=api_key, model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), temperature=0.1)
-        
-    #     # Recreate the chain with the new LLM
-    #     self.chain = self.prompt_template | self.llm | StrOutputParser()
-    #     print("LLM initialized successfully")
 
     def upload_document(self, filepath: str) -> dict:
         """

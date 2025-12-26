@@ -2,10 +2,6 @@
 venv/
 .venv/
 
-
-# Environment variables
-.env
-
 # Python
 __pycache__/
 *.py[cod]
@@ -31,9 +27,7 @@ MANIFEST
 
 # ChromaDB
 chroma_db/
-
 data/
-
 rag_engine.db/
 
 # IDE
@@ -72,8 +66,8 @@ lesson.md
 .gitignore
 test_rag_sys.py
 data-demo
-data/
 data
+styles
 rag_engine.db
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
@@ -98,4 +92,3 @@ rag_engine.db
 
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*

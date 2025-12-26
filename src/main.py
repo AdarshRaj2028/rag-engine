@@ -51,16 +51,26 @@ def get_assistant():
     return assistant
 
 def initialize_assistant():
+    """Initialize assistant from database on startup"""
     global assistant, current_model
+    
     if assistant is None:
-        # Check if we have any API keys in the environment
-        has_api_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("API_KEY"))
+        # Always create assistant first (without API key)
+        assistant = RAGAssistant(require_api_key=False, model=None)
+
+        # Load from DATABASE instead of .env
+        key_data = db.get_api_key()
         
-        if has_api_key:
-            # Get the stored model
-            current_model = os.getenv("CURRENT_MODEL")
-            assistant = RAGAssistant(require_api_key=False)
-            print(f"Assistant initialized with existing API key for model: {current_model}")
+        if key_data:
+            current_model = key_data["model"]
+            api_key = key_data["api_key"]
+            
+        # Set the API key after initialization
+            assistant.set_api_key(api_key, current_model)
+            print(f"✅ Assistant initialized from database with model: {current_model}")
+        else:
+            print("⚠️ No API key found in database - assistant ready but LLM not configured")
+    
     return assistant
 
 # Helper to get file info
@@ -132,53 +142,47 @@ def health():
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    # Enhanced file validation
+    # 1. Check file extension
     if not file.filename.lower().endswith((".pdf", ".txt")):
         raise HTTPException(status_code=400, detail="Only PDF or TXT files allowed")
 
-    # Check file size (200MB limit)
-    MAX_FILE_SIZE = 200 * 1024 * 1024  # 200MB
+    # 2. Check API key FIRST (before saving anything)
+    try:
+        assistant_instance = get_assistant()
+    except HTTPException:
+        raise HTTPException(status_code=400, detail="API key is required before uploading a document.")
+
+    # 3. Check file size
+    MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB
     file_content = await file.read()
     file_size = len(file_content)
     
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400, 
-            detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size (200MB)"
+            detail=f"File size ({file_size / (1024*1024):.2f}MB) exceeds maximum allowed size (25MB)"  # ✅ Fixed
         )
     
-    # Reset file pointer after reading
+    # 4. Reset file pointer
     await file.seek(0)
 
+    # 5. NOW save file (only if all checks pass)
     filepath = os.path.join(UPLOAD_DIR, file.filename)
-
-    # Save file
     with open(filepath, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Check if assistant is initialized
-    try:
-        assistant_instance = get_assistant()
-    except HTTPException:
-        raise HTTPException(status_code=400, detail="API key is required before uploading a document.")
-
-    # Track processing time and get file metadata
+    # 6. Process document (utils.py validation happens here)
     start_time = time.time()
-    
-    # Get file metadata before processing
     file_metadata = get_file_info(filepath)
-    
-    # Process document
     result = assistant_instance.upload_document(filepath)
-    
     processing_time = time.time() - start_time
 
+    # 7. Handle errors and cleanup
     if result.get("status") == "error":
-        # Clean up file on error
         if os.path.exists(filepath):
             os.remove(filepath)
         raise HTTPException(status_code=500, detail=result.get("error"))
-
+    
     # Enhanced response with comprehensive metadata
     response = {
         "status": "success",
@@ -209,7 +213,7 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/api-key")
 async def save_api_key(request: ApiKeyRequest):
     """
-    Save API key to environment file and initialize the assistant
+    Save API key to DATABASE (not .env file!)
     """
     global assistant, current_model
     
@@ -223,57 +227,58 @@ async def save_api_key(request: ApiKeyRequest):
         if not model:
             raise HTTPException(status_code=400, detail="Model selection is required")
         
-        # Determine which API key to set based on the model
+        # Determine provider based on model
         if "gemini" in model.lower():
-            env_key = "GOOGLE_API_KEY"
+            provider = "google"
         elif "llama" in model.lower() or "groq" in model.lower():
-            env_key = "GROQ_API_KEY"
+            provider = "groq"
         elif "gpt" in model.lower():
-            env_key = "OPENAI_API_KEY"
+            provider = "openai"
         else:
-            # Use generic API_KEY for unknown models (won't happen as we give model as mandatory in frontend)
-            env_key = "API_KEY"
+            provider = "unknown"
         
-        # Update .env
-        set_key(".env", env_key, api_key)
-        # Store the current model in .env
-        set_key(".env", "CURRENT_MODEL", model)
-        
-        # Reload .env
-        load_dotenv(override=True)
+        # Save to DATABASE instead of .env
+        db.save_api_key(api_key, model, provider)
         
         # Store the current model globally
         current_model = model
         
-        # Initialize the assistant now that we have an API key
+        # Initialize or update the assistant
         if assistant is None:
             assistant = RAGAssistant(require_api_key=False, model=model)
+            assistant.set_api_key(api_key, model)
         else:
-            # Update existing assistant with new API key and model
             assistant.set_api_key(api_key, model)
         
         return {"status": "success", "message": f"API key saved for {model}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save API key: {str(e)}")
-
+    
 # API key status endpoint - returns the model
 @app.get("/api-key-status")
 async def check_api_key_status():
     """
-    Check if an API key is stored and return the model
+    Check if an API key is stored in DATABASE
     """
     try:
-        has_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("API_KEY"))
-        model = os.getenv("CURRENT_MODEL") if has_key else None
+        # ✅ Check DATABASE instead of environment
+        key_data = db.get_api_key()
         
-        return {
-            "has_api_key": has_key, 
-            "model": model,
-            "success": True
-        }
+        if key_data:
+            return {
+                "has_api_key": True,
+                "model": key_data["model"],
+                "success": True
+            }
+        else:
+            return {
+                "has_api_key": False,
+                "model": None,
+                "success": True
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to check API key status: {str(e)}")
-
+    
 # ---------- Send message ----------
 
 @app.post("/messages")

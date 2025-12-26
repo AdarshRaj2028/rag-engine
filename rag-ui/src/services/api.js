@@ -52,24 +52,24 @@ export const storeApiKey = async (apiKey, model) => {
   }
 };
 
-// Returns the model along with the status
 export const checkApiKeyStatus = async () => {
   try {
     const response = await fetch(`${API_BASE}/api-key-status`);
-    const data = await response.json();
     
-    if (response.ok) {
-      return {
-        success: true,
-        has_api_key: data.has_api_key,
-        model: data.model || null // Include model in response
-      };
-    } else {
-      return { success: false, error: data.detail || `HTTP ${response.status}` };
+    if (!response.ok) {
+      console.error('API key status check failed:', response.status);
+      return { success: false, has_api_key: false, model: null };
     }
+    
+    const data = await response.json();
+    return {
+      success: true,
+      has_api_key: data.has_api_key,
+      model: data.model || null
+    };
   } catch (error) {
     console.error('API key status check failed:', error);
-    return { success: false, error: error.message || 'Network connection failed' };
+    return { success: false, has_api_key: false, model: null };
   }
 };
 

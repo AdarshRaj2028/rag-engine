@@ -111,6 +111,18 @@ class RAGDatabase:
                 FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
             )
             """)
+            # Table 5: API Keys Table
+            self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT DEFAULT 'default_user',
+                api_key_encrypted TEXT NOT NULL,
+                model TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
             
             # Creates indexes for faster queries
             self.cursor.execute("""
@@ -185,6 +197,59 @@ class RAGDatabase:
         doc_id = uuid.uuid5(uuid.NAMESPACE_URL, checksum).hex
         return doc_id
 
+    def save_api_key(self, api_key: str, model: str, provider: str, user_id: str = "default_user"):
+        """Save or update API key in database"""
+    # Check if key exists for this user
+        self.cursor.execute(
+            "SELECT id FROM api_keys WHERE user_id = ?", 
+            (user_id,)
+        )
+        existing = self.cursor.fetchone()
+        
+        if existing:
+            # Update existing
+            self.cursor.execute("""
+                UPDATE api_keys 
+                SET api_key_encrypted = ?, model = ?, provider = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            """, (api_key, model, provider, user_id))
+        else:
+            # Insert new
+            self.cursor.execute("""
+                INSERT INTO api_keys (user_id, api_key_encrypted, model, provider)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, api_key, model, provider))
+        
+        self.conn.commit()
+        return True
+
+    def get_api_key(self, user_id: str = "default_user"):
+        """Retrieve API key and model from database"""
+        self.cursor.execute("""
+            SELECT api_key_encrypted, model, provider 
+            FROM api_keys 
+            WHERE user_id = ? 
+            ORDER BY updated_at DESC 
+            LIMIT 1
+        """, (user_id,))
+        
+        result = self.cursor.fetchone()
+        if result:
+            return {
+                "api_key": result[0],
+                "model": result[1],
+                "provider": result[2]
+            }
+        return None
+
+    def has_api_key(self, user_id: str = "default_user"):
+        """Check if user has stored API key"""
+        self.cursor.execute(
+            "SELECT COUNT(*) FROM api_keys WHERE user_id = ?", 
+            (user_id,)
+        )
+        count = self.cursor.fetchone()[0]
+        return count > 0
 # ===============================================================================
 # Session Operations
 

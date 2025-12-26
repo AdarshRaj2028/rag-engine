@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from app import RAGAssistant
+from database import RAGDatabase
 
 # 1. Page Configuration
 st.set_page_config(
@@ -43,7 +44,22 @@ init_session_state()
 def get_rag_assistant():
     """Initialize RAG Assistant - cached to avoid recreation"""
     try:
-        assistant = RAGAssistant()
+        # Create assistant without requiring API key
+        assistant = RAGAssistant(require_api_key=False)
+        
+        # Try to load API key from database
+        db = RAGDatabase("rag_engine.db")
+        db.connect()
+        key_data = db.get_api_key()
+        db.close()
+        
+        if key_data:
+            # Initialize LLM with database key
+            assistant.set_api_key(key_data["api_key"], key_data["model"])
+            st.success(f"✅ Loaded API key for {key_data['model']} from database")
+        else:
+            st.warning("⚠️ No API key found. Please add API key via React frontend.")
+        
         return assistant
     except Exception as e:
         st.error(f"Failed to initialize RAG Assistant: {e}")

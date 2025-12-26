@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useFileContext } from '../context/FileContext';
 
-const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB in bytes
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 
 function Sidebar() {
   const location = useLocation();

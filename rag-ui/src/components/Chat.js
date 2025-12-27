@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect} from 'react';
 import { useFileContext } from '../context/FileContext';
 import * as api from '../services/api';
 
@@ -6,9 +6,7 @@ const Chat = () => {
   const { 
     uploadedFile, 
     fileProcessed, 
-    newlyProcessed, 
     wasProcessed,
-    clearNewlyProcessedFlag, 
     sessionId,
     selectedModel,
     apiKey,
@@ -39,20 +37,6 @@ const Chat = () => {
       loadMessages();
     }
   }, [sessionId]);
-  
-  // Welcome message with suggested questions
-  const getWelcomeMessage = useCallback(() => ({
-    role: 'assistant',
-    content: `Hello! I've loaded your document and I'm ready to help. Ask me anything about its contents!`
-  }), [uploadedFile]);
-
-  // Show welcome message when a new file is processed
-  useEffect(() => {
-    if (newlyProcessed && uploadedFile) {
-      setMessages([getWelcomeMessage()]);
-      clearNewlyProcessedFlag();
-    }
-  }, [newlyProcessed, uploadedFile, clearNewlyProcessedFlag, getWelcomeMessage]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

@@ -91,11 +91,12 @@ This project was developed as a collaborative effort for ReadyTensor's AAIDC Cou
 
 **2. Jamiya** - *Frontend Developer & API Integration Specialist*
 - React UI development and component design
+- Configured FastAPI
 - Frontend-backend API integration using FastAPI
 - Chat interface and user interaction design
 - API request/response handling
 - Consistent styling and usability
-- Configured FastAPI
+- Helped in Testing both UI Versions
 
 **3. Natalie** - *Programming & Documentation Support*
 - RAG code module development

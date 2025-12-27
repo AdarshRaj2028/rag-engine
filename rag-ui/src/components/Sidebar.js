@@ -47,7 +47,7 @@ function Sidebar() {
     
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError(`File size must be less than 200MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+      setUploadError(`File size must be less than 25MB. Current size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
       return false;
     }
     

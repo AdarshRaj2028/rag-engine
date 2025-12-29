@@ -1,6 +1,24 @@
+<div align="center">
+
 # RAG Engine
 
- RAG Engine is a near production grade Retrieval-Augmented Generation system that transforms static documents into an interactive, AI-powered knowledge base. By combining semantic search with state-of-the-art Large Language Models, RAG Engine delivers accurate, context-aware responses grounded in your specific documents.
+### *A Collaborative Project under ReadyTensor AAIDC Programme*
+
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
+[![LangChain](https://img.shields.io/badge/🦜_LangChain-121212?style=for-the-badge)](https://www.langchain.com/)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6584?style=for-the-badge)](https://www.trychroma.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+
+**A near production-grade Retrieval-Augmented Generation system that transforms static documents into an interactive, AI-powered knowledge base. By combining semantic search with state-of-the-art Large Language Models, RAG Engine delivers accurate, context-aware responses grounded in your specific documents.**
+
+[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [API Docs](#-react-version-backend-documentation) • [Team](#-team)
+
+</div>
+
+---
 
 ## 🚀 Features
 
@@ -14,45 +32,101 @@
 
 ## 📋 Table of Contents
 
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-  - [Streamlit Mode](#cli-mode)
-  - [API Mode](#api-mode)
-- [API Documentation](#api-documentation)
-- [Project Structure](#project-structure)
-- [How It Works](#how-it-works)
-- [Limitations](#limitations)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+- [Team](#-team)
+- [Architecture](#-architecture)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Usage](#-usage)
+  - [Streamlit Version](#streamlit-version)
+  - [React Version](#react-version)
+- [React Version Backend Documentation](#-react-version-backend-documentation)
+- [Project Structure](#-project-structure)
+- [How It Works](#-how-it-works)
+- [Limitations](#-limitations)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgments](#-acknowledgments)
 
-## 🏗️ Architecture
+## 👥 Team
+
+This project was developed as a collaborative effort for ReadyTensor's AAIDC Course (Project 1).
+
+### Team Members
+
+**1. Adarsh Raj - Lead Developer & AI/ML Architect**\
+**GitHub: [@AdarshRaj2028](https://github.com/AdarshRaj2028)**
+- Project lead and coordinator
+- Overall architecture and pipeline design
+- Created Streamlit version and connected with the backend
+- RAG logic implementation (retriever, embedder, vector DB flow)
+- SQLite database setup and schema design
+- Smart caching system (SHA-256 + UUID5)
+- Helped in configuring vector database
+- Final testing and debugging
+
+**2. Jamiya Begam - Frontend Developer & API Integration**\
+**GitHub: [@jamiya-begam-k-17](https://github.com/jamiya-begam-k-17)**
+- React UI development and component design
+- Configured FastAPI
+- Frontend-backend API integration using FastAPI
+- Chat interface and user interaction design
+- API request/response handling
+- Consistent styling and usability
+- Helped in testing both UI versions
+
+**3. Natalie Wanjiru - Programming & Documentation Support**\
+**GitHub: [@Wanjiru-Natalie](https://github.com/Wanjiru-Natalie)**
+- RAG code module development
+- Document loading, chunking, embedding implementation
+- Vector database handling
+- Technical documentation for backend
+- System architecture documentation
+- Overall architecture reviewer
+
+**4. Sunday Victor - AI/ML Theory & Optimization Specialist**\
+**GitHub: [@Sunvic567](https://github.com/Sunvic567)**
+- Embedding model research and evaluation
+- RAG performance testing
+- Retrieval parameter fine-tuning (chunk size, overlap, n_results)
+- Model performance benchmarking
+- Comparison reports and recommendations
+- Theoretical documentation and RAG overview
+- Laid the foundation of vector database
+
+### Collaboration
+
+This project showcases effective team collaboration with clear role division while maintaining flexibility for cross-functional contributions. Each team member brought unique expertise to create a robust, near production-ready RAG system.
+
+- **Project Timeline**: September 2025 - December 2025
+- **Course**: ReadyTensor AAIDC Programme
+- **Project Type**: Retrieval-Augmented Generation System
+
+## 🗂️ Architecture
 
 ```
-┌───────────────────────────────────────────────────────────┐
-│                     USER INTERACTION                      │
-│                  (Streamlit)                   │
-└────────────────────────────┬──────────────────────────────┘
-                             │
-                  ┌──────────▼─────────┐
-                  │  Upload Document   │
-                  │ (PDF or TXT)       |
-                  └─────────┬──────────┘
-                            │
-         ┌──────────────────▼───────────────────────────────┐
-         │          SMART CACHING CHECK                     │
-         │  ─────────────────────────────                   │
-         │  1. Compute SHA-256 hash from file bytes         │
-         │  2. Generate deterministic UUID5 from hash       │
-         │  3. Query SQLite: document_id exists?            │
-         └─────────────────┬────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                     USER INTERACTION                     │
+│                  (Streamlit/React)                       │
+└────────────────────────┬─────────────────────────────────┘
+                         │
+              ┌──────────▼──────────┐
+              │  Upload Document    │
+              │ (PDF or TXT)        │
+              └──────────┬──────────┘
+                         │
+         ┌───────────────▼──────────────────────────────┐
+         │          SMART CACHING CHECK                 │
+         │  ────────────────────────────                │
+         │  1. Compute SHA-256 hash from file byte      │
+         │  2. Generate deterministic UUID5 from hash   │
+         │  3. Query SQLite: document_id exists?        │
+         └─────────────────┬────────────────────────────┘
                            │
-               ┌───────────▼────────────┐
-               │      Cache Hit?        │
-               └───┬──────────────┬─────┘
+               ┌───────────▼──────────┐
+               │      Cache Hit?      │
+               └───┬──────────────┬───┘
                    │              │
               YES  │              │  NO
                    │              │
@@ -116,7 +190,7 @@
                           │
                 ┌─────────▼──────────────┐
                 │  Response Delivery     │
-                │  ────────────────────  │
+                │ ────────────────────── │
                 │  • AI-generated answer │
                 │  • Source citations    │
                 │  • Metadata tracking   │
@@ -147,7 +221,6 @@
 ```bash
 git clone https://github.com/AdarshRaj2028/rag-engine.git
 cd rag-engine
-git checkout dev
 ```
 
 ### 2. Create Virtual Environment
@@ -168,37 +241,16 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 4. Create Required Directories
-
-```bash
-mkdir -p data chroma_db
-```
-
 ## ⚙️ Configuration
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+There is a `.env.example` template.
 
-```env
-# Choose ONE provider and set the corresponding API key
-
-# Option 1: OpenAI
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o-mini
-
-# Option 2: Google Gemini
-GOOGLE_API_KEY=AIza...
-GOOGLE_MODEL=gemini-2.0-flash-exp
-
-# Option 3: Groq
-GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.1-8b-instant
-
-# Vector Database Settings (optional)
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-CHROMA_COLLECTION_NAME=rag_documents
+```bash
+cp .env.example .env
 ```
+This will create a configured `.env` file for you to run the Streamlit version. 
 
 ### File Limits
 
@@ -217,33 +269,54 @@ MAX_TXT_SIZE_MB = 10
 
 ## 🎯 Usage
 
-The RAG Engine offers twwo different interfaces to suit your needs:
-1. Streamlit UI Mode (Recommended for Beginners)
-Beautiful web interface with glassmorphism design - perfect for non-technical users:
-bash# Start the Streamlit app
-streamlit run frontend_app.py
-Features:
+The RAG Engine offers two different interfaces to suit your needs:
 
-🎨 Modern glassmorphism UI with gradient backgrounds
-📁 Drag-and-drop file upload
-💬 Real-time chat interface with typing animation
-📚 Source attribution with expandable context
-🔄 Smart caching indicators
-📊 Document metadata display (chunks, pages, file size)
-### API Mode
+### Streamlit Version
+
+Beautiful web interface with glassmorphism design - perfect for non-technical users:
+
+```bash
+# Start the Streamlit app
+cd src
+streamlit run frontend_app.py
+```
+
+**Features:**
+
+- 🎨 Modern glassmorphism UI with gradient backgrounds
+- 📁 Drag-and-drop file upload
+- 💬 Real-time chat interface with typing animation
+- 📚 Source attribution with expandable context
+- 🔄 Smart caching indicators
+- 📊 Document metadata display (chunks, pages, file size)
+
+### React Version
 
 For production deployments and integration with frontends:
 
 ```bash
-# Start the FastAPI server
+# Start the FastAPI based backend server first
+cd src
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+```bash
+# Then start the React based frontend
+cd rag-ui
+npm start
+```
+
+**Extra Features:**
+
+- 🔑 BYOK (Bring Your Own Key) concept implemented
+- 📁 Separated key fetching from database
+- 🔐 Separated folder to keep data segregated from Streamlit Version
 
 The API will be available at `http://localhost:8000`
 
 **Interactive API Docs**: Visit `http://localhost:8000/docs` for Swagger UI
 
-## 📡 API Documentation
+## 📡 React Version Backend Documentation
 
 ### Base URL
 
@@ -459,7 +532,7 @@ rag-engine/
 │   ├── utils.py                  # File validation, PDF parsing
 │   └── frontend_app.py           # Streamlit UI with glassmorphism design
 │
-├── rag-ui/                       # React frontend (cloud deployment)
+├── rag-ui/                       # React frontend 
 │   ├── src/
 │   │   ├── components/           # Reusable UI components
 │   │   │   ├── Chat.jsx          # Chat interface with message history
@@ -487,7 +560,7 @@ rag-engine/
 ├── requirements.txt              # Python dependencies
 ├── .env.example                  # Environment variable template
 ├── .gitignore                    # Git ignore rules
-├── LICENSE                       # CC BY-NC-SA 4.0 License
+├── LICENSE                       # MIT License
 └── README.md                     # This file
 ```
 
@@ -505,7 +578,7 @@ rag-engine/
    - Generate embeddings using sentence-transformers
    - Store chunks in vector database
 4. If existing:
-   - Reuse existing chunks (no reprocessing)
+   - Reuse existing chunks (no reprocessing, saves time)
 5. Create session → Link session to document → Return session_id
 ```
 
@@ -549,7 +622,7 @@ The system uses content-based deduplication:
   - Only retrieves top 3 chunks by default
   - May miss relevant information if query is too broad
 
-## 🐛 Troubleshooting
+## 🛠 Troubleshooting
 
 ### Issue: "No API key found"
 
@@ -605,89 +678,14 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch: `git push origin feature-name`
 5. Open a Pull Request
 
-### Development Setup
-
-```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest
-
-# Format code
-black .
-isort .
-
-# Type checking
-mypy .
-```
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-```
-
-##👥 Team
-
-```
-This project was developed as a collaborative effort for ReadyTensor's AAIDC Course (Project 1).
-
-Team Members
-1. Adarsh Raj - Lead Developer & AI/ML Architect
-
-Project lead and coordinator
-Overall architecture and pipeline design
-Create Streamlit version and connected with the backend.
-RAG logic implementation (retriever, embedder, vector DB flow)
-SQLite database setup and schema design
-Smart caching system (SHA-256 + UUID5)
-Helped in configuring Vector database
-Final testing and debugging
-2. Jamiya - Frontend Developer & API Integration
-
-React UI development and component design
-Configured FastAPI
-Frontend-backend API integration using FastAPI
-Chat interface and user interaction design
-API request/response handling
-Consistent styling and usability
-Helped in Testing both UI Versions
-3. Natalie - Programming & Documentation Support
-
-RAG code module development
-Document loading, chunking, embedding implementation
-Vector database handling
-Technical documentation for backend
-System architecture documentation
-Overall acrchitecture reviewer
-4. Victor - AI/ML Theory & Optimization Specialist
-
-Embedding model research and evaluation
-RAG performance testing
-Retrieval parameter fine-tuning (chunk size, overlap, n_results)
-Model performance benchmarking
-Comparison reports and recommendations
-Theoretical documentation and RAG overview
-Laid the foundation of Vector Database
-Collaboration
-This project showcases effective team collaboration with clear role division while maintaining flexibility for cross-functional contributions. Each team member brought unique expertise to create a robust, production-ready RAG system.
-
-Project Timeline: [Sep 2025] - [Dec 2025]
-Course: ReadyTensor AAIDC Programme
-Project Type: Retrieval-Augmented Generation System
-```
-```
 ## 🙏 Acknowledgments
 
 - **LangChain**: For document processing and LLM integrations
 - **ChromaDB**: For vector database functionality
 - **Sentence Transformers**: For embedding generation
 - **FastAPI**: For the REST API framework
-
-## 📧 Contact
-
-For questions or support:
-
-- **GitHub Issues**: [Create an issue](https://github.com/AdarshRaj2028/rag-engine/issues)
-- **Documentation**: Check the [Wiki](https://github.com/AdarshRaj2028/rag-engine/wiki)
